@@ -1,0 +1,195 @@
+Jenkins Installation Documentation :
+
+Jenkins relies on Git to fetch code from repositories like GitHub.
+Maven is required to compile, build, and package Java projects.
+Java (JDK) is mandatory because Jenkins itself runs on Java, and it is needed to build Java applications.
+🔹 If you don’t install these tools manually, Jenkins will fail to run builds that require them.
+
+
+Lauch Ec2 Ubuntu free tier instance on AWS 
+Make sure to Update security groups 
+Inbound rules :
+All traffic 0.0.0./0
+TCP port 8080 - 0.0.0./0
+Outbound rules :
+All traffic 0.0.0./0
+
+Launch instance
+Take public ip address and login from AWS cli
+copy paste the keypair for instance in cli in pem format.
+login to server using that saved pem.
+
+ssh -i keypair.pem ubuntu@18.227.81.173
+export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+
+Refer document : https://www.jenkins.io/doc/book/installing/linux/
+
+Install java jdk17 : prerequesit for Jenkins beacause Jenkins is Java based application :
+
+sudo apt update
+sudo apt install fontconfig openjdk-17-jre
+java -version
+#openjdk version "17.0.13" 2024-10-15
+#OpenJDK Runtime Environment (build 17.0.13+11-Debian-2)
+#OpenJDK 64-Bit Server VM (build 17.0.13+11-Debian-2, mixed mode, sharing)
+
+Ajay
+Ajjenkins1@
+
+sudo wget -O /usr/share/keyrings/jenkins-keyring.asc \
+  https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc]" \
+  https://pkg.jenkins.io/debian-stable binary/ | sudo tee \
+  /etc/apt/sources.list.d/jenkins.list > /dev/null
+sudo apt-get update
+sudo apt-get install jenkins
+
+sudo systemctl enable jenkins
+sudo systemctl start jenkins
+sudo systemctl status jenkins
+
+
+Maven installation :
+
+sudo apt update
+sudo apt install maven -y
+
+
+ubuntu@Jenkins:~$ mvn -version
+Apache Maven 3.8.7
+Maven home: /usr/share/maven
+Java version: 17.0.14, vendor: Ubuntu, runtime: /usr/lib/jvm/java-17-openjdk-amd64
+Default locale: en, platform encoding: UTF-8
+OS name: "linux", version: "6.8.0-1021-aws", arch: "amd64", family: "unix"
+
+Git installation :
+sudo apt install git -y
+
+
+
+ubuntu@Jenkins:~$ git --version
+git version 2.43.0
+ubuntu@Jenkins:~$ mvn --version
+Apache Maven 3.8.7
+Maven home: /usr/share/maven
+Java version: 17.0.14, vendor: Ubuntu, runtime: /usr/lib/jvm/java-17-openjdk-amd64
+Default locale: en, platform encoding: UTF-8
+OS name: "linux", version: "6.8.0-1021-aws", arch: "amd64", family: "unix"
+ubuntu@Jenkins:~$ java --version
+openjdk 17.0.14 2025-01-21
+OpenJDK Runtime Environment (build 17.0.14+7-Ubuntu-124.04)
+OpenJDK 64-Bit Server VM (build 17.0.14+7-Ubuntu-124.04, mixed mode, sharing)
+
+To find Java installed path in EC2 :
+readlink -f $(which java)
+
+export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64/bin/java
+export PATH=$JAVA_HOME/bin:$PATH
+
+export MAVEN_HOME=/usr/share/maven
+export PATH=$MAVEN_HOME/bin:$PATH
+
+sudo vi /etc/environment
+provide below values in the file and save ctrlX then Y then enter - saved
+
+
+restart file run below cmd :
+
+source /etc/environment
+
+
+
+====================================================================================
+
+sudo apt update
+sudo apt install docker.io
+
+readlink -f $(which docker)
+usr/bin/docker
+
+set ubuntu user to docker group :
+usermod -aG docker ubuntu
+sudo systemctl restart docker
+
+Docker installation by default creates a group called docker, likewise Jenkins user and Ubuntu user are also created while installation.
+
+Providing access to users :
+sudo su -
+usermod -aG docker jenkins
+usermod -aG docker ubuntu
+systemctl restart docker - Docker daemon will get restarted
+
+Login in to server and switchuser to created :
+su - jenkins
+jenkins@ip# docker install java - which acts a isolated kind of env where it can creates a containers to run the Jenkins work loads and crashes once it is done.
+
+
+
+Jenkins master and slave config :
+manage node - new node - give details - 
+						Node name - slavenode
+						description :
+						directory - where to execute - /home/usr
+						usage - select only build jobs if labels are matching 
+						launch method - Lanch via ssh - host - give ip - creds-jenkins-creds
+						
+						label - linux
+During the worker node setup alwasy ensure to give the label selectors
+
+
+Build pipeline has created the jar file in below directory :
+/var/lib/jenkins/workspace/Git-maven-dec-pipeline/Java-myapp/target/*.jar 
+
+
+
+Build docker image using above jar file with below docker file :
+
+Dockerfile
+# Use OpenJDK base image
+FROM openjdk:17-jdk
+
+# Set working directory inside the container - name can be any since this is will be created on newly created docker container envrnmt
+WORKDIR /app
+
+# Copy the JAR file from the local machine to the container. 
+# make sure to give path correctly, from where you are saving or running docker file, from there if you ls you should get the target folder.
+# Likewise be on the path and provide till jar file, app.jar something related to newly created container or image reference, we can give any name.
+COPY target/Java-myapp-1.0-SNAPSHOT.jar app.jar
+
+# Run the Java application when the container starts
+# To run basic java application below are the must.
+CMD ["java", "-jar", "app.jar"]
+ 
+Building docker image:
+docker build adabala73867/myownapp:latest .
+adabala73867 - dockerhub username
+myownapp - create a repo in dockerhub using the name which you want to build the jar file. both should match then only we can push image to hub with no issues. if we creaate image with one name and try to push image in repo created with other name then it won't work. so both should be named common.
+First create repo in dockerhub then you will see like "adabala73867/myownapp" use same name for building the image.
+latest - tag
+
+docker images
+docker ps -a
+docker stop ps cont-id
+docker rm cont-id
+docker rmi img-id
+
+Login docker :
+export Docker_pass=Honeywell#321 --> this will be stored backend in stdin, from there we can call when we want to give passsword as input. | will pass the password value to login cmd.
+
+echo $Docker_pass | docker login -u adabala73867 --password-stdin
+
+docker logout --> logout from account
+
+push to dockerhub :
+docker push adabala73867/myownapp:latest
+
+
+=====================================
+
+if pipeline failed with error  Jenkins Declarative Pipeline Fails with /var/run/docker.sock: connect: permission denied
+provide permission to docker.sock and run the pipeline again
+
+sudo chmod 666 /var/run/docker.sock
+
+=====================================
